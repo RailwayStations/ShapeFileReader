@@ -15,12 +15,15 @@ import org.opengis.filter.Filter;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Geotools API:
@@ -50,29 +53,71 @@ public class ShapeReader {
 		}
 
 		File file = new File(args[0]);
+		
+		
 
 		if (!file.exists()) {
 			System.out.println("File not found: "+file);
 			usageAndExit();
 		}
-
-		new ShapeReader(file).walkSource();
+		ShapeReader shapeReader=new ShapeReader(file);
+		
+		Consumer<SimpleFeature> consumer;
+		if (args.length==2 && "-sql".equalsIgnoreCase(args[1])) {
+			consumer=feature->shapeReader.toSql(System.out, feature);
+		} else {
+			consumer=feature->shapeReader.toCsv(System.out, feature);
+		}
+		
+		shapeReader.walkSource(consumer);
 
 	}
 
-	public void walkSource() throws IOException {
+	public void walkSource(Consumer<SimpleFeature> featureConsumer) throws IOException {
 		Filter filter = Filter.INCLUDE; // ECQL.toFilter("BBOX(THE_GEOM, 10,20,30,40)")
         FeatureCollection<SimpleFeatureType, SimpleFeature> collection = source.getFeatures(filter);
         try (FeatureIterator<SimpleFeature> features = collection.features()) {
             while (features.hasNext()) {
                 SimpleFeature feature = features.next();
-				System.out.print(feature.getID().substring(feature.getID().indexOf('.') + 1));
-				System.out.print(";" + getTitle(zhToEnglish, feature));
-				Point geometryProperty = (Point) feature.getDefaultGeometryProperty().getValue();
-				Coordinate coordinate = geometryProperty.getCoordinate();
-				System.out.println(";" + coordinate.getY() + "," + coordinate.getX());
+				featureConsumer.accept(feature);
             }
         }
+	}
+	
+	private void toCsv(PrintStream writer, SimpleFeature feature) {
+		writer.print(feature.getID().substring(feature.getID().indexOf('.') + 1));
+		writer.print(";" + getTitle(zhToEnglish, feature));
+		Point geometryProperty = (Point) feature.getDefaultGeometryProperty().getValue();
+		Coordinate coordinate = geometryProperty.getCoordinate();
+		writer.println(";" + coordinate.getY() + "," + coordinate.getX());
+	}
+	
+	private void toSql(PrintStream writer, SimpleFeature feature) {
+		// beispiel SQL
+		// INSERT INTO stations (countryCode, id, uicibnr, title, lat, lon) 
+		// VALUES ('ru', '5946', NULL, 'Elektrodepo (Электродепо)', 47.1522862, 39.7556311);
+		writer.print("Insert into `stations` ");
+		writer.print(" (countryCode, id, uicibnr, title, lat, lon)");
+		writer.print(" VALUES ");
+		writer.print("(");
+		writer.print("\"cn\", "); // country code, fixed cn
+		
+		writer.print(feature.getID().substring(feature.getID().indexOf('.') + 1)); // id
+		writer.print(", ");
+		
+		writer.print("NULL, "); // uicibnr
+		
+		writer.print("\"");
+		writer.print(getTitle(zhToEnglish, feature)); // title
+		writer.print("\"");
+		writer.print(", ");
+		
+		Point geometryProperty = (Point) feature.getDefaultGeometryProperty().getValue();
+		Coordinate coordinate = geometryProperty.getCoordinate();
+		writer.print(coordinate.getY()); // lat
+		writer.print(", ");
+		writer.print(coordinate.getX()); // long
+		writer.print(");\n");
 	}
 
 	private String getTitle(final MandarinLocationTransscriber transscriber, final SimpleFeature feature) {
