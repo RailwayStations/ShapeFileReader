@@ -96,20 +96,22 @@ public class ShapeReader {
 		// beispiel SQL
 		// INSERT INTO stations (countryCode, id, uicibnr, title, lat, lon) 
 		// VALUES ('ru', '5946', NULL, 'Elektrodepo (Электродепо)', 47.1522862, 39.7556311);
-		writer.print("Insert into `stations` ");
+		writer.print("INSERT INTO stations");
 		writer.print(" (countryCode, id, uicibnr, title, lat, lon)");
 		writer.print(" VALUES ");
 		writer.print("(");
-		writer.print("\"cn\", "); // country code, fixed cn
+		writer.print("'cn', "); // country code, fixed cn
 		
+		writer.print("'");
 		writer.print(feature.getID().substring(feature.getID().indexOf('.') + 1)); // id
+		writer.print("'");
 		writer.print(", ");
 		
 		writer.print("NULL, "); // uicibnr
 		
-		writer.print("\"");
+		writer.print("'");
 		writer.print(getTitle(zhToEnglish, feature)); // title
-		writer.print("\"");
+		writer.print("'");
 		writer.print(", ");
 		
 		Point geometryProperty = (Point) feature.getDefaultGeometryProperty().getValue();
