@@ -1,17 +1,5 @@
 package de.llorcs.geotools.shapereader;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -25,7 +13,14 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
 
-import com.ibm.icu.text.Transliterator;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Geotools API:
@@ -34,7 +29,9 @@ import com.ibm.icu.text.Transliterator;
 public class ShapeReader {
 	
 	private static final NameImpl ZH_NAME_IMPL = new NameImpl("NAME_ZH");
-	private FeatureSource<SimpleFeatureType, SimpleFeature> source;
+	private final FeatureSource<SimpleFeatureType, SimpleFeature> source;
+	private final MandarinLocationTransscriber zhToEnglish = MandarinLocationTransscriber.toEnglish();
+	private final MandarinLocationTransscriber zhToGerman = MandarinLocationTransscriber.toGerman();
 
 	ShapeReader(File file) throws IOException {
 		Map<String, Object> map = new HashMap<>();
@@ -48,8 +45,6 @@ public class ShapeReader {
 
 
 	public static void main(String[] args) throws IOException {
-		// read
-		// https://docs.geotools.org/latest/userguide/tutorial/quickstart/maven.html
 		if (args.length==0) {
 			usageAndExit();
 		}
@@ -66,33 +61,24 @@ public class ShapeReader {
 	}
 
 	public void walkSource() throws IOException {
-
-		MandarinLocationTransscriber zhToEnglish = MandarinLocationTransscriber.toEnglish();
-		MandarinLocationTransscriber zhToGerman = MandarinLocationTransscriber.toGerman();
-
 		Filter filter = Filter.INCLUDE; // ECQL.toFilter("BBOX(THE_GEOM, 10,20,30,40)")
         FeatureCollection<SimpleFeatureType, SimpleFeature> collection = source.getFeatures(filter);
         try (FeatureIterator<SimpleFeature> features = collection.features()) {
             while (features.hasNext()) {
                 SimpleFeature feature = features.next();
 				System.out.print(feature.getID().substring(feature.getID().indexOf('.') + 1));
-				System.out.print(";" + getTitle(feature.getProperties()));
+				System.out.print(";" + getTitle(zhToEnglish, feature));
 				Point geometryProperty = (Point) feature.getDefaultGeometryProperty().getValue();
 				Coordinate coordinate = geometryProperty.getCoordinate();
 				System.out.println(";" + coordinate.getY() + "," + coordinate.getX());
-                
-                
-                Collection<Property> properties = feature.getProperties();
-                Optional<String> optZhName = findZhName(properties);
-                String names = optZhName.map(chinese->{
-                	String english=zhToEnglish.translate(chinese);
-                	String german=zhToGerman.translate(chinese);
-					return translated + " (" + chinese + ")";
-                	return "ZH: "+chinese+", EN: "+english+", DE: "+german;
-                }).orElse("No Name found.");
-                System.out.println(names);
             }
         }
+	}
+
+	private String getTitle(final MandarinLocationTransscriber transscriber, final SimpleFeature feature) {
+		Collection<Property> properties = feature.getProperties();
+		Optional<String> optZhName = findZhName(properties);
+		return optZhName.map(chinese-> transscriber.translate(chinese) + " (" + chinese + ")").orElse("No Name found.");
 	}
 
 	private Optional<String> findZhName(Collection<Property> properties) {
@@ -101,13 +87,12 @@ public class ShapeReader {
 				// re-interpreting the string in UTF-8.
 				String rawName=(String)prop.getValue();
 				byte[] rawBytes = rawName.getBytes("ISO_8859_1");
-				return new String(rawBytes, "UTF-8");
+				return new String(rawBytes, StandardCharsets.UTF_8);
 			} catch (UnsupportedEncodingException e) {
 				throw new RuntimeException(e);
 			}
 		}).findFirst();
 	}
-
 
 	private static void usageAndExit() {
 		System.out.println("Run with 1 argument with the path to the .shp file.");
