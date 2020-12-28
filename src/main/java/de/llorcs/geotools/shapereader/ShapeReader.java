@@ -3,10 +3,14 @@ package de.llorcs.geotools.shapereader;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
@@ -14,16 +18,24 @@ import org.geotools.data.FeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.feature.NameImpl;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Point;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
 
+import com.ibm.icu.text.Transliterator;
+
+/**
+ * Geotools API:
+ * https://docs.geotools.org/latest/userguide/tutorial/quickstart/maven.html
+ */
 public class ShapeReader {
 	
 	private static final NameImpl ZH_NAME_IMPL = new NameImpl("NAME_ZH");
 	private FeatureSource<SimpleFeatureType, SimpleFeature> source;
-	
+
 	ShapeReader(File file) throws IOException {
 		Map<String, Object> map = new HashMap<>();
         map.put("url", file.toURI().toURL());
@@ -33,39 +45,41 @@ public class ShapeReader {
 
         source = dataStore.getFeatureSource(typeName);
 	}
-	
-	
+
+
 	public static void main(String[] args) throws IOException {
-		// read 
+		// read
 		// https://docs.geotools.org/latest/userguide/tutorial/quickstart/maven.html
 		if (args.length==0) {
 			usageAndExit();
 		}
-		
+
 		File file = new File(args[0]);
-		
+
 		if (!file.exists()) {
 			System.out.println("File not found: "+file);
 			usageAndExit();
 		}
-		
+
 		new ShapeReader(file).walkSource();
-        
+
 	}
 
 	public void walkSource() throws IOException {
-		
+
 		MandarinLocationTransscriber zhToEnglish = MandarinLocationTransscriber.toEnglish();
 		MandarinLocationTransscriber zhToGerman = MandarinLocationTransscriber.toGerman();
-		
+
 		Filter filter = Filter.INCLUDE; // ECQL.toFilter("BBOX(THE_GEOM, 10,20,30,40)")
         FeatureCollection<SimpleFeatureType, SimpleFeature> collection = source.getFeatures(filter);
         try (FeatureIterator<SimpleFeature> features = collection.features()) {
             while (features.hasNext()) {
                 SimpleFeature feature = features.next();
-                System.out.print(feature.getID());
-                System.out.print(": ");
-                System.out.println(feature.getDefaultGeometryProperty().getValue());
+				System.out.print(feature.getID().substring(feature.getID().indexOf('.') + 1));
+				System.out.print(";" + getTitle(feature.getProperties()));
+				Point geometryProperty = (Point) feature.getDefaultGeometryProperty().getValue();
+				Coordinate coordinate = geometryProperty.getCoordinate();
+				System.out.println(";" + coordinate.getY() + "," + coordinate.getX());
                 
                 
                 Collection<Property> properties = feature.getProperties();
@@ -73,6 +87,7 @@ public class ShapeReader {
                 String names = optZhName.map(chinese->{
                 	String english=zhToEnglish.translate(chinese);
                 	String german=zhToGerman.translate(chinese);
+					return translated + " (" + chinese + ")";
                 	return "ZH: "+chinese+", EN: "+english+", DE: "+german;
                 }).orElse("No Name found.");
                 System.out.println(names);
@@ -98,5 +113,5 @@ public class ShapeReader {
 		System.out.println("Run with 1 argument with the path to the .shp file.");
 		System.exit(-1);
 	}
-	
+
 }
