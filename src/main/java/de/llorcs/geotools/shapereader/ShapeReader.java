@@ -93,7 +93,7 @@ public class ShapeReader {
 	}
 	
 	private void toSql(PrintStream writer, SimpleFeature feature) {
-		// beispiel SQL
+		// beispiel SQL aus https://raw.githubusercontent.com/RailwayStations/Bahnhofsdaten/main/russia/batch-import2.sql
 		// INSERT INTO stations (countryCode, id, uicibnr, title, lat, lon) 
 		// VALUES ('ru', '5946', NULL, 'Elektrodepo (Электродепо)', 47.1522862, 39.7556311);
 		writer.print("INSERT INTO stations");
