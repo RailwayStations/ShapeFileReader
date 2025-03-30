@@ -1,5 +1,7 @@
 # ShapeFile Reader for chinese railway stations
 
+**Repository moved to https://codeberg.org/RailwayStations/ShapeFileReader**
+
 ## Source
 
 Idea and original version from @mkirchmann at https://github.com/mkirchmann/shapereader
